@@ -19,6 +19,7 @@
 package recap
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -206,7 +207,7 @@ func TestContextManager_SlidingWindow(t *testing.T) {
 
 	// Add more messages than window size
 	for i := 0; i < 10; i++ {
-		cm.AddUserMessage("Message " + string(rune('0'+i)))
+		cm.AddUserMessage(fmt.Sprintf("Message %d", i))
 	}
 
 	messages := cm.GetMessages()
