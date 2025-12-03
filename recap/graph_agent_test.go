@@ -317,21 +317,23 @@ func TestGraphAgent_routeBranchCondition(t *testing.T) {
 			wantErrNil: true,
 		},
 		{
-			name: "max depth reached",
+			name: "max depth reached - error already set by checkLimitNode",
 			state: &GraphAgentState{
 				CurrentDepth: 5,
 				MaxDepth:     5,
+				Error:        "Maximum recursion depth (5) reached",
 			},
 			wantNode:   NodeFinalize,
 			wantErrNil: true,
 		},
 		{
-			name: "max steps exceeded",
+			name: "max steps exceeded - error already set by checkLimitNode",
 			state: &GraphAgentState{
 				CurrentDepth: 0,
 				MaxDepth:     5,
 				StepCount:    10,
 				MaxSteps:     10,
+				Error:        "Maximum steps (10) exceeded",
 			},
 			wantNode:   NodeFinalize,
 			wantErrNil: true,
@@ -406,6 +408,98 @@ func TestGraphAgent_routeBranchCondition(t *testing.T) {
 
 			if node != tt.wantNode {
 				t.Errorf("node = %s, want %s", node, tt.wantNode)
+			}
+		})
+	}
+}
+
+func TestGraphAgent_checkLimitNode(t *testing.T) {
+	ctx := context.Background()
+
+	ga := &GraphAgent{
+		agent: &Agent{
+			config: &AgentConfig{},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		state     *GraphAgentState
+		wantError string
+	}{
+		{
+			name: "within limits",
+			state: &GraphAgentState{
+				CurrentDepth: 2,
+				MaxDepth:     5,
+				StepCount:    5,
+				MaxSteps:     10,
+			},
+			wantError: "",
+		},
+		{
+			name: "max depth reached",
+			state: &GraphAgentState{
+				CurrentDepth: 5,
+				MaxDepth:     5,
+				StepCount:    0,
+				MaxSteps:     10,
+			},
+			wantError: "Maximum recursion depth (5) reached",
+		},
+		{
+			name: "max depth exceeded",
+			state: &GraphAgentState{
+				CurrentDepth: 6,
+				MaxDepth:     5,
+				StepCount:    0,
+				MaxSteps:     10,
+			},
+			wantError: "Maximum recursion depth (5) reached",
+		},
+		{
+			name: "max steps reached",
+			state: &GraphAgentState{
+				CurrentDepth: 0,
+				MaxDepth:     5,
+				StepCount:    10,
+				MaxSteps:     10,
+			},
+			wantError: "Maximum steps (10) exceeded",
+		},
+		{
+			name: "max steps exceeded",
+			state: &GraphAgentState{
+				CurrentDepth: 0,
+				MaxDepth:     5,
+				StepCount:    15,
+				MaxSteps:     10,
+			},
+			wantError: "Maximum steps (10) exceeded",
+		},
+		{
+			name: "depth limit checked first - overwrites existing error",
+			state: &GraphAgentState{
+				CurrentDepth: 6,
+				MaxDepth:     5,
+				StepCount:    0,
+				MaxSteps:     10,
+				Error:        "Previous error",
+			},
+			wantError: "Maximum recursion depth (5) reached",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ga.checkLimitNode(ctx, tt.state)
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			if result.Error != tt.wantError {
+				t.Errorf("state.Error = %q, want %q", result.Error, tt.wantError)
 			}
 		})
 	}

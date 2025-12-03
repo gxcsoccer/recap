@@ -77,14 +77,14 @@ type RecursionFrame struct {
 
 // Node names for the graph
 const (
-	NodePlan        = "plan"
-	NodeExecute     = "execute"
-	NodeRefine      = "refine"
-	NodeRoute       = "route"
-	NodePushFrame   = "push_frame"
-	NodePopFrame    = "pop_frame"
-	NodeCheckDepth  = "check_depth"
-	NodeFinalize    = "finalize"
+	NodePlan       = "plan"
+	NodeExecute    = "execute"
+	NodeRefine     = "refine"
+	NodeRoute      = "route"
+	NodeCheckLimit = "check_limit"
+	NodePushFrame  = "push_frame"
+	NodePopFrame   = "pop_frame"
+	NodeFinalize   = "finalize"
 )
 
 // GraphAgent implements ReCAP using eino's Graph orchestration
@@ -124,6 +124,12 @@ func (ga *GraphAgent) buildGraph(ctx context.Context) error {
 	err := graph.AddLambdaNode(NodePlan, compose.InvokableLambda(ga.planNode))
 	if err != nil {
 		return fmt.Errorf("failed to add plan node: %w", err)
+	}
+
+	// CheckLimit node: checks depth and step limits
+	err = graph.AddLambdaNode(NodeCheckLimit, compose.InvokableLambda(ga.checkLimitNode))
+	if err != nil {
+		return fmt.Errorf("failed to add check limit node: %w", err)
 	}
 
 	// Execute node: executes the current subtask
@@ -169,10 +175,16 @@ func (ga *GraphAgent) buildGraph(ctx context.Context) error {
 		return fmt.Errorf("failed to add START->Plan edge: %w", err)
 	}
 
-	// Plan -> Route
-	err = graph.AddEdge(NodePlan, NodeRoute)
+	// Plan -> CheckLimit
+	err = graph.AddEdge(NodePlan, NodeCheckLimit)
 	if err != nil {
-		return fmt.Errorf("failed to add Plan->Route edge: %w", err)
+		return fmt.Errorf("failed to add Plan->CheckLimit edge: %w", err)
+	}
+
+	// CheckLimit -> Route
+	err = graph.AddEdge(NodeCheckLimit, NodeRoute)
+	if err != nil {
+		return fmt.Errorf("failed to add CheckLimit->Route edge: %w", err)
 	}
 
 	// Add conditional edges from Route using GraphBranch
@@ -197,10 +209,10 @@ func (ga *GraphAgent) buildGraph(ctx context.Context) error {
 		return fmt.Errorf("failed to add Execute->Refine edge: %w", err)
 	}
 
-	// Refine -> Route
-	err = graph.AddEdge(NodeRefine, NodeRoute)
+	// Refine -> CheckLimit
+	err = graph.AddEdge(NodeRefine, NodeCheckLimit)
 	if err != nil {
-		return fmt.Errorf("failed to add Refine->Route edge: %w", err)
+		return fmt.Errorf("failed to add Refine->CheckLimit edge: %w", err)
 	}
 
 	// PushFrame -> Plan (for recursion)
@@ -209,10 +221,10 @@ func (ga *GraphAgent) buildGraph(ctx context.Context) error {
 		return fmt.Errorf("failed to add PushFrame->Plan edge: %w", err)
 	}
 
-	// PopFrame -> Route
-	err = graph.AddEdge(NodePopFrame, NodeRoute)
+	// PopFrame -> CheckLimit
+	err = graph.AddEdge(NodePopFrame, NodeCheckLimit)
 	if err != nil {
-		return fmt.Errorf("failed to add PopFrame->Route edge: %w", err)
+		return fmt.Errorf("failed to add PopFrame->CheckLimit edge: %w", err)
 	}
 
 	// Finalize -> END
@@ -232,8 +244,26 @@ func (ga *GraphAgent) buildGraph(ctx context.Context) error {
 	return nil
 }
 
+// checkLimitNode checks depth and step limits and sets error state if exceeded
+func (ga *GraphAgent) checkLimitNode(ctx context.Context, state *GraphAgentState) (*GraphAgentState, error) {
+	// Check depth limit
+	if state.CurrentDepth >= state.MaxDepth {
+		state.Error = fmt.Sprintf("Maximum recursion depth (%d) reached", state.MaxDepth)
+		return state, nil
+	}
+
+	// Check step limit
+	if state.StepCount >= state.MaxSteps {
+		state.Error = fmt.Sprintf("Maximum steps (%d) exceeded", state.MaxSteps)
+		return state, nil
+	}
+
+	return state, nil
+}
+
 // routeBranchCondition determines the next node based on state
-// This is used with compose.NewGraphBranch for conditional routing
+// This function performs routing logic and may set state.Done when detecting task completion.
+// Limit checking and error state setting is handled by checkLimitNode.
 func (ga *GraphAgent) routeBranchCondition(ctx context.Context, state *GraphAgentState) (string, error) {
 	// Check for errors
 	if state.Error != "" {
@@ -245,18 +275,6 @@ func (ga *GraphAgent) routeBranchCondition(ctx context.Context, state *GraphAgen
 		return NodeFinalize, nil
 	}
 
-	// Check depth limit
-	if state.CurrentDepth >= state.MaxDepth {
-		state.Error = fmt.Sprintf("Maximum recursion depth (%d) reached", state.MaxDepth)
-		return NodeFinalize, nil
-	}
-
-	// Check step limit
-	if state.StepCount >= state.MaxSteps {
-		state.Error = fmt.Sprintf("Maximum steps (%d) exceeded", state.MaxSteps)
-		return NodeFinalize, nil
-	}
-
 	// Check if we have subtasks to execute
 	if state.CurrentPlan == nil || len(state.CurrentPlan.Subtasks) == 0 {
 		// No more subtasks at this level
@@ -264,7 +282,7 @@ func (ga *GraphAgent) routeBranchCondition(ctx context.Context, state *GraphAgen
 			// Pop back to parent level
 			return NodePopFrame, nil
 		}
-		// All done
+		// All done - mark as complete
 		state.Done = true
 		return NodeFinalize, nil
 	}
