@@ -6,7 +6,6 @@ require (
 	github.com/cloudwego/eino v0.7.4
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.5
 	github.com/stretchr/testify v1.10.0
-	go.uber.org/mock v0.4.0
 )
 
 require (
