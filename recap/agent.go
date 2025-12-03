@@ -321,7 +321,7 @@ func (a *Agent) executePrimitive(ctx context.Context, subtask *Subtask) *Executi
 		log.Printf("[ReCAP] Executing tool '%s' with args: %s", toolName, string(argsJSON))
 	}
 
-	// Execute the tool
+	// Execute the tool (no options needed for basic execution)
 	output, err := invokable.InvokableRun(ctx, string(argsJSON))
 	if err != nil {
 		return &ExecutionResult{
