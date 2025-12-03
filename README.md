@@ -42,10 +42,11 @@ import (
     "fmt"
     "log"
 
-    "github.com/cloudwego/eino/components/model/openai"
+    "github.com/cloudwego/eino-ext/components/model/openai"
+    "github.com/cloudwego/eino/components/tool"
     "github.com/cloudwego/eino/compose"
-    "github.com/gxcsoccer/recap/recap"
     "github.com/cloudwego/eino/schema"
+    "github.com/gxcsoccer/recap/recap"
 )
 
 func main() {
@@ -61,7 +62,7 @@ func main() {
     config := &recap.AgentConfig{
         ToolCallingModel: chatModel,
         ToolsConfig: compose.ToolsNodeConfig{
-            Tools: []compose.Tool{
+            Tools: []tool.BaseTool{
                 // 添加你的工具
             },
         },
