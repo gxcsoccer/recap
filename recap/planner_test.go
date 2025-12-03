@@ -21,6 +21,7 @@ package recap
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -229,11 +230,11 @@ func TestAgent_parsePlanResponse(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		content     string
-		wantErr     bool
-		wantTasks   int
-		wantThink   string
+		name      string
+		content   string
+		wantErr   bool
+		wantTasks int
+		wantThink string
 	}{
 		{
 			name: "simple JSON",
@@ -372,7 +373,7 @@ func TestAgent_generatePlan_SlidingWindow(t *testing.T) {
 	// Create more messages than window size
 	messages := make([]*schema.Message, 10)
 	for i := 0; i < 10; i++ {
-		messages[i] = schema.UserMessage("Message " + string(rune('A'+i)))
+		messages[i] = schema.UserMessage(fmt.Sprintf("Message %c", 'A'+i))
 	}
 
 	_, err := agent.generatePlan(ctx, "Task", messages)
