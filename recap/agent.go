@@ -258,8 +258,9 @@ func (a *Agent) executeRecursive(ctx context.Context, task string, ctxMgr *Conte
 		}
 
 		// Update context manager with refined plan
-		ctxMgr.UpdateFramePlan(plan)
-	}
+		if ctxMgr.CurrentDepth() > 0 {
+			ctxMgr.UpdateFramePlan(plan)
+		}
 
 	// Build final result
 	if lastResult == nil {
