@@ -147,7 +147,7 @@ func main() {
 				fmt.Print(msg.Content)
 			}
 		}
-		fmt.Println("\n")
+		fmt.Println()
 	}
 
 	fmt.Println("=== ReCAP Agent Examples Complete ===")
